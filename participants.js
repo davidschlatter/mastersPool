@@ -109,7 +109,7 @@ window.PARTICIPANTS = [
       'Max Homa',          // Tier 5
       'Dustin Johnson',    // Tier 6
     ],
-    winningScoreGuess: null, // TODO: pending from participant
+    winningScoreGuess: -10, // TODO: pending from participant
   },
   {
     name: 'Shawn',
