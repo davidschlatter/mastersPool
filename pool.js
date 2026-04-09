@@ -39,31 +39,43 @@
   }
 
   // Build a lookup index to match picks (entered as strings) to ESPN players.
-  // We match on exact full name, then on "last name only", then on
-  // "first-initial + last-name" (e.g. "S. Scheffler" == "Scottie Scheffler").
+  // Each key maps to an ARRAY of candidates so we can refuse ambiguous fallback
+  // matches (critical when two brothers share a last name, e.g. the Højgaards).
   function buildPlayerIndex(players) {
-    const byFull = new Map();
-    const byLast = new Map();
-    const byInitialLast = new Map();
+    const byFull = new Map();            // "rasmus hojgaard" -> player (unique)
+    const byLast = new Map();            // "hojgaard"        -> [p1, p2, ...]
+    const byInitialLast = new Map();     // "r hojgaard"      -> [p1, p2, ...]
+
+    function push(map, key, p) {
+      if (!key) return;
+      const arr = map.get(key);
+      if (!arr) { map.set(key, [p]); return; }
+      if (!arr.includes(p)) arr.push(p);
+    }
 
     for (const p of players) {
       const full = normalizeName(p.name);
-      if (full) {
-        byFull.set(full, p);
-      }
-      const parts = full.split(' ').filter(Boolean);
-      if (parts.length) {
-        const last = parts[parts.length - 1];
-        // Support double-barrelled last names by also indexing the last two words
-        const lastTwo = parts.slice(-2).join(' ');
-        if (!byLast.has(last)) byLast.set(last, p);
-        if (!byLast.has(lastTwo)) byLast.set(lastTwo, p);
+      if (!full) continue;
+      byFull.set(full, p);
 
-        if (parts.length > 1) {
-          const initial = parts[0][0] + ' ' + last;
-          if (!byInitialLast.has(initial)) byInitialLast.set(initial, p);
-        }
+      const parts = full.split(' ').filter(Boolean);
+      if (!parts.length) continue;
+
+      const last = parts[parts.length - 1];
+      const lastTwo = parts.slice(-2).join(' ');
+      push(byLast, last, p);
+      if (lastTwo !== last) push(byLast, lastTwo, p);
+
+      if (parts.length > 1) {
+        const initial = parts[0][0] + ' ' + last;
+        push(byInitialLast, initial, p);
       }
+    }
+
+    function uniqueGet(map, key) {
+      const arr = map.get(key);
+      if (!arr || arr.length !== 1) return null;
+      return arr[0];
     }
 
     return {
@@ -71,26 +83,45 @@
         const norm = normalizeName(query);
         if (!norm) return null;
 
+        // 1. Exact full-name match
         if (byFull.has(norm)) return byFull.get(norm);
 
         const parts = norm.split(' ').filter(Boolean);
         if (!parts.length) return null;
 
-        // Try "first-initial + last" form
+        // 2. First-initial + last name (e.g. "S. Scheffler" -> "Scottie Scheffler")
         if (parts.length > 1) {
-          const initial = parts[0][0] + ' ' + parts.slice(-1)[0];
-          if (byInitialLast.has(initial)) return byInitialLast.get(initial);
+          const initial = parts[0][0] + ' ' + parts[parts.length - 1];
+          const hit = uniqueGet(byInitialLast, initial);
+          if (hit) return hit;
+        }
+
+        // 3. Two-word last name (e.g. "De Chambeau")
+        if (parts.length > 1) {
           const lastTwo = parts.slice(-2).join(' ');
-          if (byLast.has(lastTwo)) return byLast.get(lastTwo);
+          const hit = uniqueGet(byLast, lastTwo);
+          if (hit) return hit;
         }
 
+        // 4. Last-name only — but only if UNAMBIGUOUS (one player with that last
+        // name). This prevents "Rasmus Højgaard" silently resolving to Nicolai.
         const last = parts[parts.length - 1];
-        if (byLast.has(last)) return byLast.get(last);
-
-        // Loose contains match (last resort)
-        for (const [key, player] of byFull.entries()) {
-          if (key.includes(norm) || norm.includes(key)) return player;
+        const lastArr = byLast.get(last);
+        if (lastArr && lastArr.length === 1) return lastArr[0];
+        if (lastArr && lastArr.length > 1) {
+          console.warn(
+            `[Pool] Ambiguous last-name match for "${query}"; candidates: ` +
+            lastArr.map((p) => p.name).join(', ')
+          );
         }
+
+        // 5. Loose substring fallback (only if unambiguous)
+        const candidates = [];
+        for (const [key, player] of byFull.entries()) {
+          if (key.includes(norm) || norm.includes(key)) candidates.push(player);
+        }
+        if (candidates.length === 1) return candidates[0];
+
         return null;
       },
     };
@@ -111,6 +142,9 @@
   function scoreParticipant(participant, index, winner) {
     const picks = participant.picks.map((pickName) => {
       const player = index.find(pickName);
+      if (!player) {
+        console.warn(`[Pool] No leaderboard match for pick "${pickName}" (${participant.name})`);
+      }
       return { pickName, player };
     });
 
