@@ -49,7 +49,7 @@ window.PARTICIPANTS = [
       'Keegan Bradley',    // Tier 5
       'Wyndham Clark',     // Tier 6
     ],
-    winningScoreGuess: null, // TODO: pending from participant
+    winningScoreGuess: -9, // TODO: pending from participant
   },
   {
     name: 'Connor',
@@ -85,7 +85,7 @@ window.PARTICIPANTS = [
       'Ben Griffin',       // Tier 5
       'Nicolas Echavarria',// Tier 6
     ],
-    winningScoreGuess: null, // TODO: pending from participant
+    winningScoreGuess: -11, // TODO: pending from participant
   },
   {
     name: 'Carp',
