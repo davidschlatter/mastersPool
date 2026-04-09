@@ -118,7 +118,7 @@ window.PARTICIPANTS = [
       'Hideki Matsuyama',  // Tier 2
       'Akshay Bhatia',     // Tier 3
       'J.J. Spaun',        // Tier 4
-      'Rasmus Hojgaard',   // Tier 5
+      'Rasmus Højgaard',   // Tier 5
       'Wyndham Clark',     // Tier 6
     ],
     winningScoreGuess: -10,

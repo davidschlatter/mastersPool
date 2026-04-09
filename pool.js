@@ -7,13 +7,30 @@
 
   // --- Name matching --------------------------------------------------------
 
+  // Map non-decomposable Latin letters (NFD leaves these alone) to their
+  // closest ASCII equivalents. Needed for names like "Rasmus Højgaard",
+  // "Thorbjørn Olesen", "Víctor Pérez", etc. so "o" and "ø" match.
+  const LATIN_EXTRAS = {
+    'ø': 'o', 'Ø': 'o',
+    'æ': 'ae', 'Æ': 'ae',
+    'œ': 'oe', 'Œ': 'oe',
+    'ß': 'ss',
+    'đ': 'd', 'Đ': 'd',
+    'ð': 'd', 'Ð': 'd',
+    'ł': 'l', 'Ł': 'l',
+    'þ': 'th', 'Þ': 'th',
+  };
+
   // Remove punctuation, diacritics, suffixes; lowercase.
   function normalizeName(name) {
     if (!name) return '';
-    return name
-      .toString()
+    let s = name.toString();
+    // Translate non-decomposable letters first so NFD-safe stripping below
+    // doesn't wipe them out entirely (e.g. "ø" would become "").
+    s = s.replace(/[øØæÆœŒßđĐðÐłŁþÞ]/g, (c) => LATIN_EXTRAS[c] || c);
+    return s
       .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')      // strip accents
+      .replace(/[\u0300-\u036f]/g, '')      // strip combining accents
       .toLowerCase()
       .replace(/\b(jr|sr|ii|iii|iv)\b/g, '')
       .replace(/[^a-z\s]/g, ' ')
